@@ -39,8 +39,8 @@ if "historico" not in st.session_state:
     st.session_state.historico = []
 
 # Login
-usuario_correto = "Dario"
-senha_correta = "1234"
+usuario_correto = st.secrets["credentials"]["usuario"]
+senha_correta = st.secrets["credentials"]["senha"]
 
 if not st.session_state.logado:
     st.subheader("🔐 Login")
