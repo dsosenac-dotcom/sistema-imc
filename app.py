@@ -76,6 +76,10 @@ else:
         if altura > 0:
             imc = peso / (altura ** 2)
             
+            # Peso ideal (fórmula simples de Devine)
+            peso_ideal = 50 + 0.91 * (altura * 100 - 152.4)
+            peso_ideal = round(peso_ideal, 1)
+            
             if imc < 18.5:
                 classificacao = "Abaixo do peso"
                 dica = "Tente aumentar a ingestão calórica com alimentos nutritivos e consulte um nutricionista."
@@ -102,6 +106,7 @@ else:
             c3.metric("Peso", f"{peso:.1f} kg")
             
             st.metric("Seu IMC", f"{imc:.2f}")
+            st.metric("Peso Ideal (aproximado)", f"{peso_ideal} kg")
             
             if tipo == "info":
                 st.info(f"📌 Classificação: **{classificacao}**")
@@ -115,6 +120,15 @@ else:
             st.markdown("### 💡 Dica de Saúde")
             st.write(dica)
             
+            # Diferença para o peso ideal
+            diferenca = round(peso - peso_ideal, 1)
+            if diferenca > 0:
+                st.write(f"Você está **{diferenca} kg** acima do peso ideal.")
+            elif diferenca < 0:
+                st.write(f"Você está **{abs(diferenca)} kg** abaixo do peso ideal.")
+            else:
+                st.write("Você está no peso ideal!")
+            
             # Histórico
             registro = {
                 "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -126,12 +140,17 @@ else:
         else:
             st.error("Altura inválida")
     
-    # Mostra histórico
+    # Histórico
     if st.session_state.historico:
         st.markdown("---")
         st.subheader("📜 Histórico de Cálculos")
+        
         for i, item in enumerate(reversed(st.session_state.historico), 1):
             st.write(f"**{i}.** {item['data']} — {item['nome']} | IMC: **{item['imc']}** ({item['classificacao']})")
+        
+        if st.button("🗑️ Limpar Histórico"):
+            st.session_state.historico = []
+            st.rerun()
     
     st.markdown("---")
     if st.button("🚪 Sair"):
