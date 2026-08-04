@@ -1,4 +1,5 @@
 import streamlit as st
+import sqlite3
 from datetime import datetime
 
 st.set_page_config(
@@ -32,13 +33,58 @@ st.markdown("<h1>💪 Sistema de IMC</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #aaaaaa;'>Login + Cálculo de Índice de Massa Corporal</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# Estados
+# ===== FUNÇÕES DO BANCO DE DADOS =====
+def criar_banco():
+    conn = sqlite3.connect("imc.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historico (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data TEXT,
+            nome TEXT,
+            idade INTEGER,
+            altura REAL,
+            peso REAL,
+            imc REAL,
+            classificacao TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def salvar_historico(nome, idade, altura, peso, imc, classificacao):
+    conn = sqlite3.connect("imc.db")
+    cursor = conn.cursor()
+    data = datetime.now().strftime("%d/%m/%Y %H:%M")
+    cursor.execute("""
+        INSERT INTO historico (data, nome, idade, altura, peso, imc, classificacao)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (data, nome, idade, altura, peso, imc, classificacao))
+    conn.commit()
+    conn.close()
+
+def carregar_historico():
+    conn = sqlite3.connect("imc.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT data, nome, imc, classificacao FROM historico ORDER BY id DESC LIMIT 10")
+    dados = cursor.fetchall()
+    conn.close()
+    return dados
+
+def limpar_historico():
+    conn = sqlite3.connect("imc.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM historico")
+    conn.commit()
+    conn.close()
+
+# Cria o banco na primeira execução
+criar_banco()
+
+# ===== LOGIN =====
 if "logado" not in st.session_state:
     st.session_state.logado = False
-if "historico" not in st.session_state:
-    st.session_state.historico = []
 
-# Login
 usuario_correto = st.secrets["credentials"]["usuario"]
 senha_correta = st.secrets["credentials"]["senha"]
 
@@ -75,10 +121,7 @@ else:
     if st.button("Calcular IMC"):
         if altura > 0:
             imc = peso / (altura ** 2)
-            
-            # Peso ideal (fórmula simples de Devine)
-            peso_ideal = 50 + 0.91 * (altura * 100 - 152.4)
-            peso_ideal = round(peso_ideal, 1)
+            peso_ideal = round(50 + 0.91 * (altura * 100 - 152.4), 1)
             
             if imc < 18.5:
                 classificacao = "Abaixo do peso"
@@ -96,6 +139,9 @@ else:
                 classificacao = "Obesidade"
                 dica = "É importante buscar orientação médica e nutricional para um plano seguro de emagrecimento."
                 tipo = "error"
+            
+            # Salva no banco
+            salvar_historico(nome, idade, altura, peso, round(imc, 2), classificacao)
             
             st.markdown("---")
             st.markdown(f"### Resultado de **{nome}**")
@@ -120,7 +166,6 @@ else:
             st.markdown("### 💡 Dica de Saúde")
             st.write(dica)
             
-            # Diferença para o peso ideal
             diferenca = round(peso - peso_ideal, 1)
             if diferenca > 0:
                 st.write(f"Você está **{diferenca} kg** acima do peso ideal.")
@@ -128,29 +173,24 @@ else:
                 st.write(f"Você está **{abs(diferenca)} kg** abaixo do peso ideal.")
             else:
                 st.write("Você está no peso ideal!")
-            
-            # Histórico
-            registro = {
-                "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "nome": nome,
-                "imc": round(imc, 2),
-                "classificacao": classificacao
-            }
-            st.session_state.historico.append(registro)
         else:
             st.error("Altura inválida")
     
-    # Histórico
-    if st.session_state.historico:
-        st.markdown("---")
-        st.subheader("📜 Histórico de Cálculos")
-        
-        for i, item in enumerate(reversed(st.session_state.historico), 1):
-            st.write(f"**{i}.** {item['data']} — {item['nome']} | IMC: **{item['imc']}** ({item['classificacao']})")
+    # Histórico do banco
+    st.markdown("---")
+    st.subheader("📜 Histórico de Cálculos (Banco de Dados)")
+    
+    historico = carregar_historico()
+    
+    if historico:
+        for i, item in enumerate(historico, 1):
+            st.write(f"**{i}.** {item[0]} — {item[1]} | IMC: **{item[2]}** ({item[3]})")
         
         if st.button("🗑️ Limpar Histórico"):
-            st.session_state.historico = []
+            limpar_historico()
             st.rerun()
+    else:
+        st.write("Nenhum cálculo registrado ainda.")
     
     st.markdown("---")
     if st.button("🚪 Sair"):
